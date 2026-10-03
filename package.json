@@ -1,7 +1,7 @@
 {
   "name": "dsh-surface-unify",
-  "version": "0.1.0",
-  "description": "让所有插件面板的背景与壁纸引擎（dsh-plugin-wallpaper-engine）的面板玻璃配方保持一致：把 layer-1 的配方用 var() 间接引用接管 --dsw-alias-bg-base / layer-2 / layer-3，源值一变全局跟着变，不碰 DOM 结构、不注册服务。DSH web plugin: unify every plugin surface with the wallpaper-engine glass recipe.",
+  "version": "0.3.0",
+  "description": "让「插件打开的页面」（shell.overlay / main 座位出口里的整页、宿主 Modal 的对话框卡片）拿到壁纸引擎设置窗口那套毛玻璃（backdrop-filter + 镜面高光 + 内描边），配方与引擎逐字一致、模糊半径跟随 --we-blur；DSH 自带的界面（对话主区 / 设置窗口 / 侧栏）一律不碰，一个 CSS 令牌都不写。DSH web plugin: give plugin-opened pages the wallpaper-engine frosted-glass recipe.",
   "type": "module",
   "main": "lib/index.js",
   "engines": {
