@@ -7,6 +7,7 @@
  *   1. 绝不写任何 CSS 令牌（v0.1 改坏对话主区的那件事，必须永远不再发生）；
  *   2. 壁纸没开时一个标记都不打；
  *   3. 只给「插件打开的页面」上霜：座位出口的页面、宿主 Modal 的对话框卡片；
+ *      —— 但内核图片灯箱那张 backdrop（`role="dialog"` 打在整个遮罩自己身上）不算；
  *   4. DSH 自带的界面一律不碰：对话主区、设置窗口、侧栏锚（自己命中或子树里出现）；
  *   5. 横幅 / 提示条 / 小浮窗（尺寸不够）不上霜；
  *   6. 页面根节点被引擎算成透明（`--dsw-alias-bg-base` 被置成 transparent）时仍然接管；
@@ -166,6 +167,20 @@ settingsCard.appendChild(new El({ attrs: { 'data-slot': 'settings.section' } }))
 const smallDialog = new El({ attrs: { role: 'dialog' }, bg: 'rgba(20, 20, 20, 0.9)', rect: { width: 400, height: 200 } })
 for (const child of [mask, modalCard, settingsCard, smallDialog]) modalRoot.appendChild(child)
 
+// ── 场景 3b：内核图片灯箱（`role="dialog"` 打在整个 backdrop 上）──────────────
+// `@deepseek-ai/dsh-client-ui-attachment` 的 ImageLightbox 是 body portal，形态为
+//   div.backdrop[role="dialog"][aria-modal] > (div.mask[aria-hidden] + img + button)
+// 它是遮罩不是面板：上霜会把「图片外面那一圈」本来压暗的底换成玻璃色（用户报的正是这个）。
+const lightbox = new El({ attrs: { role: 'dialog', 'aria-modal': 'true' }, bg: 'rgba(0, 0, 0, 0.85)', rect: { width: 1600, height: 900 } })
+const lightboxMask = new El({ attrs: { 'aria-hidden': 'true' }, bg: 'rgba(0, 0, 0, 0.6)', rect: { width: 1600, height: 900 } })
+const lightboxImage = new El({ tag: 'img', rect: { width: 900, height: 600 } })
+const lightboxClose = new El({ tag: 'button', rect: { width: 32, height: 32 } })
+for (const child of [lightboxMask, lightboxImage, lightboxClose]) lightbox.appendChild(child)
+// 反例：真正的对话框卡片里有个 16×16 装饰性 aria-hidden，不能因此被当成遮罩放过。
+const decorDialog = new El({ attrs: { role: 'dialog' }, bg: 'rgba(25, 25, 25, 0.9)', rect: { width: 800, height: 600 } })
+decorDialog.appendChild(new El({ attrs: { 'aria-hidden': 'true' }, rect: { width: 16, height: 16 } }))
+for (const child of [lightbox, decorDialog]) modalRoot.appendChild(child)
+
 for (const child of [overlayHost, mainHost, modalRoot]) body.appendChild(child)
 
 const allCandidates = [
@@ -190,6 +205,11 @@ const allCandidates = [
   modalCard,
   settingsCard,
   smallDialog,
+  lightbox,
+  lightboxMask,
+  lightboxImage,
+  lightboxClose,
+  decorDialog,
 ]
 
 body.querySelectorAll = (selector) => descendants(body).filter((el) => matchesSelector(el, selector))
@@ -335,13 +355,16 @@ check('自带 background-image 时不抢它的高光', !gradientPanel.hasAttribu
 check('横幅（1600×42）尺寸不够，不上霜', !banner.hasAttribute(MARK))
 check('小对话框（400×200）尺寸不够，不上霜', !smallDialog.hasAttribute(MARK))
 check('Modal 遮罩（role=presentation）不上霜', !mask.hasAttribute(MARK))
+check('内核图片灯箱（role=dialog 打在 backdrop 自己身上）不上霜', !lightbox.hasAttribute(MARK))
+check('灯箱自己的遮罩层不上霜（图片外面那一圈保持原样）', !lightboxMask.hasAttribute(MARK))
+check('卡片里只有 16×16 装饰性 aria-hidden 时照常上霜（排除不过宽）', decorDialog.hasAttribute(MARK))
 
 // ── 3. DSH 自带的界面一律不碰 ───────────────────────────────────────────────
 check('对话主区（子树里有 conversation 锚）不上霜', !nativePage.hasAttribute(MARK))
 check('主区里的对话出口（data-slot=main.conversation）不上霜', !conversation.hasAttribute(MARK))
 check('设置窗口（子树里有 settings.section）不上霜', !settingsCard.hasAttribute(MARK))
 check('套在已上霜页面里的对话框不叠第二层霜', !nestedDialog.hasAttribute(MARK))
-check('标记数正确（5 个画面元素）', markedCount() === 5, `marked=${markedCount()}`)
+check('标记数正确（6 个画面元素）', markedCount() === 6, `marked=${markedCount()}`)
 
 // ── 4. 绝不写令牌 ───────────────────────────────────────────────────────────
 check('body 上没有任何行内令牌写入（对话主区不再被染色）', bodyInlineWrites.length === 0, JSON.stringify(bodyInlineWrites))
