@@ -32,15 +32,21 @@
 
    三条判据**同时满足**才算一个要上霜的页面：
 
-   - **真的画了面**：算出来的 `background-color` 有 alpha，或自带 `background-image`。
-     全屏透明包裹层不算 —— 但它会被**往下钻一层**，找到真正画面的那层；
+   - **不只是个空壳**：
+     - 算出来的 `background-color` 有 alpha、或自带 `background-image` ⇒ 直接接管；
+     - **自己透明**时（引擎把 `--dsw-alias-bg-base` 置成了 `transparent`，页面根节点常写成
+       `background: var(--dsw-alias-bg-base)`，比如工程流程工作台）：
+       - 里面的子元素**全都是**"够大又画了面"的画面层 ⇒ 它只是个居中/包裹层，让位给里面那层；
+       - 否则（结构复杂、有标题栏 / 页签栏 / 内容块）⇒ **它就是页面本身，收下它**；
+       - 一个子元素都没有 ⇒ 是被复用后不再画面的面板，什么都不做。
    - **够大**：宽和高都要 ≥ 视口的 35%。横幅、提示条、小浮窗、气泡不碰；
    - **不是 DSH 自带的界面**：元素自己**或子树里**出现 `conversation` / `settings` /
-     `sidebar` 锚，或带 `[data-dsh-center-col]` 的，整棵跳过（对话主区、设置窗口、
-     侧栏都不会被误伤）。
+     `sidebar` 锚，或带 `[data-dsh-center-col]` / `[data-dsh-boot]`（内核开机卡片）的，
+     整棵跳过（对话主区、设置窗口、侧栏都不会被误伤）。
 
-   另外两条：套在已上霜面板里的对话框不叠第二层霜；`role="presentation"` 的
-   Modal 遮罩不碰（它自己就带 `backdrop-filter`）。
+   另外三条：套在已上霜面板里的对话框不叠第二层霜；`role="presentation"` 的
+   Modal 遮罩不碰（它自己就带 `backdrop-filter`）；**含 `video` 的面不碰**（壁纸 / 开机
+   动画那些层不该被盖上玻璃底色）。
 3. 配方与壁纸引擎设置窗口**逐字一致**（取自 `dsh-plugin-wallpaper-engine/lib/client.js:1819-1830`）：
 
 ```css
@@ -56,8 +62,11 @@ box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), inset 0 0 0 1px rgba(255,255,2
 
 ## 几条刻意的取舍
 
-- **只给"自己画了面"的元素上霜**：判据是算出来的 `background-color` 末位 alpha > 0.02，
-  或 `background-image ≠ none`。包裹层上霜会让 `backdrop-filter` 把整屏后面的东西一起糊掉。
+- **透明不等于"这层不存在"**：引擎把 `--dsw-alias-bg-base` 置成 `transparent` 后，
+  插件页面的根节点算出来就是透明 —— 这是 v0.4 修掉的那个 bug（v0.3 因此对工程流程
+  一个标记都没打，用户看到"装了和没装一样"）。判据因此改成上面那套"是空壳还是页面"。
+- **底色带 `!important`**：插件页面常写行内 `background: var(--dsw-alias-bg-base)`，
+  行内样式压过任何选择器 —— 不加 `!important` 就只有霜、没有玻璃底色。
 - **自带背景图的元素不抢高光**：`background-image ≠ none` 时只加模糊与内描边，
   不覆盖它自己的渐变（否则等于替它换了皮肤）。
 - **跳过设置窗口**（子树含 `[data-slot="settings.section"]` 的 dialog）：它已经有引擎的
@@ -97,7 +106,8 @@ github:NanDaDi/dsh-surface-unify
 
 ## 已知边界（说在前面）
 
-- 页面把底色画在**更深的子元素**上、自己完全透明的，只往下钻一层；再深就交给原生观感了；
+- 页面把底色画在**更深的子元素**上、自己完全透明、且子元素里混着别的东西时，会由
+  整页那一层统一接管（不再逐层往下钻）；只有"里面全是画面层"的纯包裹层才让位；
 - 页面把背景**写死成 `transparent` 字面量、不读 DSH 令牌**的，颜色层面无解
   （例如 `dsh-agency-agents` 108 处、`dsh-skills-manager` 119 处字面量）；
 - 依赖壁纸引擎的变量名（`--we-blur` / `--we-saturate` / `--we-glass-brightness`）
@@ -118,8 +128,9 @@ github:NanDaDi/dsh-surface-unify
 node test/selftest.mjs     # 无需依赖，跑浏览器半边的行为自检
 ```
 
-自检用一个最小 DOM 替身把客户端半边跑起来，覆盖：范围判定（出口页面 / 出口里的包裹层 /
-横幅 / 小对话框 / 原生对话区 / 设置窗口 / 嵌套对话框 / Modal 遮罩）、"绝不写任何 CSS 令牌"、
+自检用一个最小 DOM 替身把客户端半边跑起来，覆盖：范围判定（出口页面 / 页面根节点透明
+（工程流程的真实形态）/ 透明包裹层 / 横幅 / 小对话框 / 含 video 的面 / 内核开机卡片 /
+原生对话区 / 设置窗口 / 嵌套对话框 / Modal 遮罩）、"绝不写任何 CSS 令牌"、
 不再画面时收标记、幂等、壁纸关闭全撤、卸载后标记 / 样式表 / 监听全清。
 
 ## License

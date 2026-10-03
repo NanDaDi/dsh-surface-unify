@@ -1,7 +1,7 @@
 {
   "name": "dsh-surface-unify",
-  "version": "0.3.0",
-  "description": "让「插件打开的页面」（shell.overlay / main 座位出口里的整页、宿主 Modal 的对话框卡片）拿到壁纸引擎设置窗口那套毛玻璃（backdrop-filter + 镜面高光 + 内描边），配方与引擎逐字一致、模糊半径跟随 --we-blur；DSH 自带的界面（对话主区 / 设置窗口 / 侧栏）一律不碰，一个 CSS 令牌都不写。DSH web plugin: give plugin-opened pages the wallpaper-engine frosted-glass recipe.",
+  "version": "0.4.0",
+  "description": "让「插件打开的页面」（shell.overlay / main 座位出口里的整页、宿主 Modal 的对话框卡片）拿到壁纸引擎设置窗口那套毛玻璃（backdrop-filter + 镜面高光 + 内描边），配方与引擎逐字一致、模糊半径跟随 --we-blur；页面根节点被引擎算成透明时照样接管（工程流程工作台），含 video 的壁纸面与 DSH 自带界面（对话主区 / 设置窗口 / 侧栏 / 开机卡片）一律不碰，一个 CSS 令牌都不写。DSH web plugin: give plugin-opened pages the wallpaper-engine frosted-glass recipe.",
   "type": "module",
   "main": "lib/index.js",
   "engines": {

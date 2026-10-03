@@ -2,14 +2,15 @@
  * dsh-surface-unify — 自检（node test/selftest.mjs，无外部依赖）。
  *
  * 客户端半边是浏览器 ModuleLoader 格式、跑在页面里，没法直接 import。这个脚本
- * 造一个最小 DOM 替身把它跑起来，验证 v0.3 的范围与行为：
+ * 造一个最小 DOM 替身把它跑起来，验证 v0.4 的范围与行为：
  *
  *   1. 绝不写任何 CSS 令牌（v0.1 改坏对话主区的那件事，必须永远不再发生）；
  *   2. 壁纸没开时一个标记都不打；
  *   3. 只给「插件打开的页面」上霜：座位出口的页面、宿主 Modal 的对话框卡片；
  *   4. DSH 自带的界面一律不碰：对话主区、设置窗口、侧栏锚（自己命中或子树里出现）；
  *   5. 横幅 / 提示条 / 小浮窗（尺寸不够）不上霜；
- *   6. 透明包裹层不上霜，但会往下钻，找到它真正画面的那一层；
+ *   6. 页面根节点被引擎算成透明（`--dsw-alias-bg-base` 被置成 transparent）时仍然接管；
+ *      单纯只装着一个画面的透明包裹层，则让位给里面那层；含 video 的面不碰；
  *   7. 套在已上霜面板里的对话框不再单独上霜（不叠两层 backdrop-filter）；
  *   8. 元素不再画面 ⇒ 收标记；壁纸关闭 / 卸载插件 ⇒ 全部撤掉。
  */
@@ -44,6 +45,7 @@ function matchOne(el, selector) {
   }
   m = /^\[([A-Za-z0-9-]+)\]$/.exec(sel)
   if (m) return el.hasAttribute(m[1])
+  if (/^[a-z][a-z0-9-]*$/.test(sel)) return el.tag === sel
   throw new Error(`DOM 替身不认识的选择器: ${sel}`)
 }
 
@@ -126,9 +128,15 @@ const head = new El({ tag: 'head' })
 
 // ── 场景 1：全屏出口里的插件页面 ────────────────────────────────────────────
 const overlayHost = new El({ attrs: { 'data-slot': 'shell.overlay' } })
-const workbench = new El({ bg: 'rgba(13, 21, 36, 0.9)', rect: { width: 1600, height: 900 } })
+// 工程流程工作台的真实形态：根节点 `background: var(--dsw-alias-bg-base)`，而壁纸引擎把这个
+// 令牌置成了 transparent ⇒ 算出来就是透明，但仍然必须接管（v0.4 的修正点）。
+const workbench = new El({ bg: 'rgba(0, 0, 0, 0)', rect: { width: 1600, height: 900 } })
+const workbenchHeader = new El({ rect: { width: 1600, height: 64 } })
+const workbenchTabbar = new El({ rect: { width: 1600, height: 52 } })
+const workbenchBody = new El({ rect: { width: 1600, height: 780 } })
 const nestedDialog = new El({ attrs: { role: 'dialog' }, bg: 'rgba(30, 30, 30, 0.9)', rect: { width: 800, height: 600 } })
-workbench.appendChild(nestedDialog)
+for (const child of [workbenchHeader, workbenchTabbar, workbenchBody, nestedDialog]) workbench.appendChild(child)
+// 只装着一个画面的透明包裹层 ⇒ 让位给里面的画面层。
 const wrapper = new El({ bg: 'rgba(0, 0, 0, 0)', rect: { width: 1600, height: 900 } })
 const innerPanel = new El({ bg: 'rgba(20, 30, 50, 0.6)', rect: { width: 1000, height: 800 } })
 wrapper.appendChild(innerPanel)
@@ -136,7 +144,11 @@ const banner = new El({ bg: 'rgba(0, 0, 0, 0.5)', rect: { width: 1600, height: 4
 const nativePage = new El({ bg: 'rgba(10, 10, 10, 0.8)', rect: { width: 1600, height: 900 } })
 nativePage.appendChild(new El({ attrs: { 'data-slot': 'conversation' } }))
 const gradientPanel = new El({ bg: 'rgba(0, 0, 0, 0)', image: 'linear-gradient(90deg, #000, #fff)', rect: { width: 1200, height: 700 } })
-for (const child of [workbench, wrapper, banner, nativePage, gradientPanel]) overlayHost.appendChild(child)
+// 含 video 的面（壁纸 / 开机动画）不碰；内核开机卡片（data-dsh-boot）也不碰。
+const videoPanel = new El({ bg: 'rgba(0, 0, 0, 0)', rect: { width: 1500, height: 700 } })
+videoPanel.appendChild(new El({ tag: 'video', rect: { width: 1500, height: 700 } }))
+const bootCard = new El({ attrs: { 'data-dsh-boot': '' }, bg: 'rgba(0, 0, 0, 0)', rect: { width: 1600, height: 900 } })
+for (const child of [workbench, wrapper, banner, nativePage, gradientPanel, videoPanel, bootCard]) overlayHost.appendChild(child)
 
 // ── 场景 2：主区出口里的插件页面 + 对话主区 ─────────────────────────────────
 const mainHost = new El({ attrs: { 'data-slot': 'main' } })
@@ -159,12 +171,17 @@ for (const child of [overlayHost, mainHost, modalRoot]) body.appendChild(child)
 const allCandidates = [
   overlayHost,
   workbench,
+  workbenchHeader,
+  workbenchTabbar,
+  workbenchBody,
   nestedDialog,
   wrapper,
   innerPanel,
   banner,
   nativePage,
   gradientPanel,
+  videoPanel,
+  bootCard,
   mainHost,
   mainPage,
   conversation,
@@ -264,7 +281,7 @@ const markedCount = () => allCandidates.filter((el) => el.hasAttribute(MARK)).le
 vm.createContext(sandbox)
 vm.runInContext(readFileSync(CLIENT, 'utf8'), sandbox, { filename: 'lib/client.js' })
 
-console.log('dsh-surface-unify 自检（v0.3：只接管插件打开的页面）')
+console.log('dsh-surface-unify 自检（v0.4：只接管插件打开的页面）')
 check('__ModuleLoader__.load 被调用', captured !== null)
 check('条目 id 正确', captured?.id === 'dsh-surface-unify')
 
@@ -295,6 +312,7 @@ check(
     css.includes('contrast(1.01)'),
 )
 check('底色取引擎算好的 layer-1（带兜底）', css.includes('background-color: var(--dsw-alias-bg-layer-1,'))
+check('底色带 !important（压过插件页面自己的行内 background）', css.includes('background-color: var(--dsw-alias-bg-layer-1,') && css.split('background-color: var(--dsw-alias-bg-layer-1,')[1].includes('!important'))
 check('浅色/深色两套镜面高光都在', css.includes(`[${MARK}][${SHEEN}]`) && css.includes(`body[data-ds-dark-theme][${WALLPAPER_ATTR}] [${MARK}][${SHEEN}]`))
 check('软件渲染时禁用模糊', css.includes(`body[data-we-glass-fallback][${WALLPAPER_ATTR}] [${MARK}]`) && css.includes('backdrop-filter: none'))
 check('注册了监听', observers.length === 1)
@@ -304,6 +322,10 @@ check('注册了 resize 监听（视口变化会影响"算不算页面"）', lis
 body.setAttribute(WALLPAPER_ATTR, '')
 fire()
 check('全屏出口里的插件页面（工程流程工作台）上霜', workbench.hasAttribute(MARK))
+check('页面根节点被引擎算成透明时照样接管（工程流程的真实形态）', workbench.hasAttribute(MARK))
+check('页面内部的内容层不会被误认成页面', !workbenchBody.hasAttribute(MARK))
+check('含 video 的面不接管（壁纸 / 开机动画）', !videoPanel.hasAttribute(MARK))
+check('内核开机卡片（data-dsh-boot）不接管', !bootCard.hasAttribute(MARK))
 check('主区出口里的插件页面上霜', mainPage.hasAttribute(MARK))
 check('宿主 Modal 的对话框卡片上霜', modalCard.hasAttribute(MARK))
 check('透明包裹层不上霜', !wrapper.hasAttribute(MARK))
