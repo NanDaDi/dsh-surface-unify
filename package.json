@@ -1,0 +1,52 @@
+{
+  "name": "dsh-surface-unify",
+  "version": "0.1.0",
+  "description": "让所有插件面板的背景与壁纸引擎（dsh-plugin-wallpaper-engine）的面板玻璃配方保持一致：把 layer-1 的配方用 var() 间接引用接管 --dsw-alias-bg-base / layer-2 / layer-3，源值一变全局跟着变，不碰 DOM 结构、不注册服务。DSH web plugin: unify every plugin surface with the wallpaper-engine glass recipe.",
+  "type": "module",
+  "main": "lib/index.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node test/selftest.mjs",
+    "check": "node --check lib/index.js && node --check lib/client.js && node test/selftest.mjs"
+  },
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "peerDependencies": {
+    "cordis": "^4.0.0-rc.10"
+  },
+  "peerDependenciesMeta": {
+    "cordis": {
+      "optional": true
+    }
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "wallpaper-engine",
+    "theme"
+  ],
+  "license": "MIT"
+}
